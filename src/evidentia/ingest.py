@@ -20,43 +20,23 @@ from pathlib import Path
 
 import pandas as pd
 
-from evidentia.contracts import CaseFrame, ValidationIssue, ValidationReport
+from evidentia.contracts import (
+    SCHEMA,
+    SERIOUSNESS_FLAGS,
+    UNKNOWN,
+    CaseFrame,
+    ValidationIssue,
+    ValidationReport,
+)
 
 # --------------------------------------------------------------------------
-# Dataset schema.
+# Transformation policy.
 #
-# These are column names of an E2B/FAERS-style line listing, not PADER concepts.
-# They live here rather than in report config because they describe the *source*,
-# and a second report type over the same source reuses them unchanged.
+# Unlike SCHEMA (which describes the source and lives in contracts.py), these
+# encode *how we choose to normalise*. They belong to ingest because a different
+# ingest policy is a different set of numbers, and that must be reviewable in
+# one place.
 # --------------------------------------------------------------------------
-
-SCHEMA = {
-    "case_id": "safetyreportid",
-    "version": "safetyreportversion",
-    "date": "report_date",
-    "date_raw": "receivedate",
-    "country": "primarysourcecountry",
-    "country_alt": "occurcountry",
-    "sex": "patient_patientsex",
-    "age": "patient_patientonsetage",
-    "age_unit": "patient_patientonsetageunit",
-    "reaction_pt": "patient_reaction_reactionmeddrapt",
-    "reaction_outcome": "patient_reaction_reactionoutcome",
-    "serious": "serious",
-    "expedite": "fulfillexpeditecriteria",
-    "reporter": "primarysource_qualification",
-    "duplicate": "duplicate",
-    "indication": "patient_drug_drugindication",
-}
-
-SERIOUSNESS_FLAGS = [
-    "seriousnessdeath",
-    "seriousnesslifethreatening",
-    "seriousnesshospitalization",
-    "seriousnessdisabling",
-    "seriousnesscongenitalanomali",
-    "seriousnessother",
-]
 
 # Age unit -> multiplier to years. Anything not listed is quarantined, not guessed.
 UNIT_TO_YEARS = {
@@ -80,8 +60,6 @@ AGE_BANDS = [
     (75.0, 85.0, "75-84"),
     (85.0, 200.0, "85+"),
 ]
-
-UNKNOWN = "unknown"
 
 
 # --------------------------------------------------------------------------

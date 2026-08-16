@@ -104,12 +104,12 @@ the section or inventing content. Expectedness / labelledness is out of scope.
 **Fix:** Added `*.xlsx`, `*.xls`, `data/`, `*.egg-info/`, `build/`, `dist/`. Untracked egg-info with `git rm -r --cached`.
 **Carry-over:** Loader now dispatches on file extension and accepts both CSV and Excel, since the brief and the delivered artifact disagreed.
 
-## E-007 — Post-dedup reaction count does not match the reference PADER
-**Phase:** 1 (ingest)
-**Symptom:** Reference PADER reports 3,648 reaction events. Our post-dedup count is 3,429.
-**Cause:** Not a defect. 3,648 is exactly our *pre*-dedup figure, so the reference pipeline counts every row including superseded report versions. The 44 superseded rows carry 219 reaction events.
-**Fix:** None applied. We report 3,429 and assert 3,648 separately as proof the comma-split model matches theirs. Divergence documented as D-017.
-**Carry-over:** README limitation and a likely live-interview question. Prepared answer: the split is validated against the reference; only the dedup policy differs, and it is a config-level policy rather than a code path.
+## E-007 — Misread the reference's 3,648 as evidence it did not deduplicate (corrected)
+**Phase:** 1, corrected in Phase 2
+**Symptom:** Post-dedup reaction events came to 3,429 against the reference's stated 3,648. 3,648 was exactly our pre-dedup figure, so I concluded the reference pipeline counted superseded versions.
+**Cause:** Comparing one aggregate total against another without checking a second, independent quantity. A single matching number is weak evidence; I treated it as strong.
+**Fix:** Compared per-PT counts instead. Post-dedup reproduces the reference on 4 of 5 terms (80/46/43/33); pre-dedup matches none. The reference *does* dedupe, and 3,648 is a different quantity. D-017 rewritten.
+**Carry-over:** The generalisable lesson is that one coincidence is not corroboration. Cheap to check a second quantity, expensive to build on a wrong model of the source pipeline.
 
 ## E-008 — Branch already existed on re-run
 **Phase:** 1 (setup)
@@ -117,3 +117,24 @@ the section or inventing content. Expectedness / labelledness is out of scope.
 **Cause:** Branch created in an earlier session.
 **Fix:** `git checkout phase-1-ingest`. Untracked extracted files are unaffected by branch switching.
 **Carry-over:** None.
+
+## E-009 — Scripted refactor deleted constants by position
+**Phase:** 2 (setup)
+**Symptom:** `NameError: UNIT_TO_YEARS is not defined`, cascading into 33 test errors.
+**Cause:** Moving `SCHEMA` from `ingest.py` to `contracts.py` used a text range from a comment marker to `UNKNOWN = "unknown"`. `UNIT_TO_YEARS` and `AGE_BANDS` sat between those markers and were swept up.
+**Fix:** Restored both to `ingest.py`, where they belong — they are transformation *policy*, not source schema, so changing them changes every downstream number.
+**Carry-over:** Constants are now split on a stated principle: source description in `contracts.py`, normalisation policy in `ingest.py`.
+
+## E-010 — Regex-based code edit produced invalid syntax
+**Phase:** 2 (lint)
+**Symptom:** After scripting a fix for 15 ISC004 warnings, `ruff` reported `invalid-syntax: Positional argument cannot follow keyword argument`.
+**Cause:** The text heuristic matched any line ending in a quote followed by a string line, which caught keyword arguments such as `code="country_disagreement"` as well as genuine list elements.
+**Fix:** Rewrote the transform to locate implicit concatenations via `ast.walk`, filtering to elements of `List`/`Tuple`/`Set` nodes, and to apply edits bottom-up so earlier line numbers stay valid. Restored the corrupted file from the previous zip and reapplied.
+**Carry-over:** Structural code edits need a parser, not a regex. Also a practical argument for shipping each phase as a zip: the previous good state was one command away.
+
+## E-011 — Drug ineffective count differs from the reference by one
+**Phase:** 2 (analyses) — **open**
+**Symptom:** Our post-dedup count is 54 distinct cases; the reference PADER states 53. All four other compared terms match exactly.
+**Cause:** Unknown. Candidates: the reference excludes one duplicate-flagged case, applies a different tie-break on equal `safetyreportversion`, or filters on a field we treat as out of scope.
+**Fix:** None. The figure is asserted at 54 with a comment pointing here, so it cannot drift silently.
+**Carry-over:** README limitation. Stating a one-case unexplained gap is more defensible than tuning the pipeline until it matches, which would be fitting to an artifact rather than to the data.

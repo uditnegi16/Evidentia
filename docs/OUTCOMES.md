@@ -28,7 +28,7 @@ modify live.
 |---|---|---|---|
 | 0 | Scaffold + data profiling | Repo, venv, package skeleton, `scripts/profile_data.py` | **done** |
 | 1 | Ingest, validate, dedupe | `ingest.py`, `contracts.py`, 28 tests | **done** |
-| 2 | Analysis registry | `analyses/`, evidence contracts, pytest suite | not started |
+| 2 | Analysis registry | `analyses/`, `evidence.py`, 60 tests | **done** |
 | 3 | Config schema and assembler | `configs/pader_fda.yaml`, `assembler.py` | not started |
 | 4 | Section generation | `generate.py`, `prompts/*.jinja` | not started |
 | 5 | Grounding validator | `grounding.py` | not started |
@@ -82,7 +82,7 @@ Produced by `python -m evidentia.ingest`, all pinned by tests.
 | Superseded rows dropped | 44 |
 | Reporting period | 2024-12-27 to 2025-12-26 |
 | Reaction events, raw split | 3,648 (matches reference PADER) |
-| Reaction events, post-dedup | **3,429** (reported figure, see D-017) |
+| Reaction events, post-dedup | **3,429** (reported figure) |
 | Events removed by dedup | 219 (6.0%) |
 
 **Quality issues surfaced (post-dedup, case-level):** superseded rows dropped 44,
@@ -94,6 +94,38 @@ reactions, so the broadcast branch is unit-tested but unused on this dataset.
 
 Test suite: 28 passing. 13 ground-truth assertions (skip automatically without the
 dataset, so CI runs green with no data), 15 unit tests requiring no data.
+
+---
+
+## Phase 2 verified outputs
+
+20 registered analyses. Reference-matched figures below are the strongest
+validation in the build: they reproduce an independently produced artifact.
+
+**Against the reference PADER's Case Presentation** (distinct cases per PT):
+
+| Preferred Term | Reference | Ours |
+|---|---|---|
+| Acute kidney injury | 80 | 80 |
+| Hypotension | 46 | 46 |
+| Drug interaction | 43 | 43 |
+| Fatigue | 33 | 33 |
+| Drug ineffective | 53 | 54 (open, E-011) |
+
+Pre-dedup these were 81 / 48 / 45 / 35 / 60 — none correct. Version-dedup is
+validated, not merely argued.
+
+**Reaction outcomes** (3,429 events, exhaustive partition): recovered/resolved
+1,257; unknown 1,086; not recovered/ongoing 512; recovering/resolving 406;
+fatal 134; recovered with sequelae 34.
+
+**15-day Alert cases:** 1,023.
+
+**Data property held by test:** event-level and case-level PT counts are equal
+for every term, because no case reports the same PT twice. Asserted rather than
+assumed (D-018).
+
+Test suite: 60 passing.
 
 ---
 
