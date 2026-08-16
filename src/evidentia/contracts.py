@@ -16,6 +16,45 @@ from pydantic import BaseModel, Field
 
 Severity = Literal["info", "warning", "error"]
 
+# --------------------------------------------------------------------------
+# Dataset schema.
+#
+# Column names of an E2B/FAERS-style line listing. These describe the *source*,
+# not any report type, so a second report type over the same source reuses them
+# unchanged. They live here rather than in ingest so the analysis layer can
+# import them without importing the loader.
+# --------------------------------------------------------------------------
+
+SCHEMA = {
+    "case_id": "safetyreportid",
+    "version": "safetyreportversion",
+    "date": "report_date",
+    "date_raw": "receivedate",
+    "country": "primarysourcecountry",
+    "country_alt": "occurcountry",
+    "sex": "patient_patientsex",
+    "age": "patient_patientonsetage",
+    "age_unit": "patient_patientonsetageunit",
+    "reaction_pt": "patient_reaction_reactionmeddrapt",
+    "reaction_outcome": "patient_reaction_reactionoutcome",
+    "serious": "serious",
+    "expedite": "fulfillexpeditecriteria",
+    "reporter": "primarysource_qualification",
+    "duplicate": "duplicate",
+    "indication": "patient_drug_drugindication",
+}
+
+SERIOUSNESS_FLAGS = [
+    "seriousnessdeath",
+    "seriousnesslifethreatening",
+    "seriousnesshospitalization",
+    "seriousnessdisabling",
+    "seriousnesscongenitalanomali",
+    "seriousnessother",
+]
+
+UNKNOWN = "unknown"
+
 
 class ValidationIssue(BaseModel):
     """A single data-quality finding. Surfaced, never silently swallowed."""
@@ -64,8 +103,10 @@ class ValidationReport(BaseModel):
             f"superseded rows   {self.rows_dropped_as_superseded}",
             f"period            {self.period_start} -> {self.period_end}",
             (
-                f"reaction events   {self.reaction_events_raw} raw / "
-                f"{self.reaction_events_deduped} deduped"
+                (
+                    f"reaction events   {self.reaction_events_raw} raw / "
+                    f"{self.reaction_events_deduped} deduped"
+                ),
             ),
             "",
             "issues:",

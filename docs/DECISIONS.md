@@ -193,17 +193,37 @@ Kept as a running record so any decision can be defended or revisited.
 
 ---
 
-## D-017 — Report 3,429 reaction events, not the reference's 3,648
+## D-017 — Version-dedup is correct; 3,648 is not the comparable figure (revised)
 
-**Decided:** The report quotes **3,429** reaction events (post version-dedup). The raw comma-split figure of 3,648 is retained in the validation report and asserted in a test, but is not the reported number.
+**Superseded an earlier version of this decision.** The original reasoning defended dedup on principle while treating the reference PADER's 3,648 as evidence the reference did not dedupe. Phase 2 showed that reading was wrong.
 
-**The tension:** The supplied reference PADER states 3,648, which is exactly the pre-dedup count. The reference pipeline therefore appears not to collapse superseded report versions.
+**What the evidence actually says.** Comparing per-PT counts against the reference PADER's Case Presentation section:
 
-**Why we diverge:** 44 rows are superseded revisions of 41 cases (D-012). They carry 219 reaction events. Counting them means counting a case's reactions twice because the case was later revised. That is double-counting, not additional safety information.
+| Preferred Term | Reference | Ours, pre-dedup | Ours, post-dedup |
+|---|---|---|---|
+| Acute kidney injury | 80 | 81 | **80** |
+| Hypotension | 46 | 48 | **46** |
+| Drug interaction | 43 | 45 | **43** |
+| Fatigue | 33 | 35 | **33** |
+| Drug ineffective | 53 | 60 | 54 |
 
-**Why we still assert 3,648:** Reproducing it from raw data proves the comma-split model matches the reference pipeline's. The split is validated; only the dedup policy differs. Keeping both numbers separates "is my parsing right" from "is my counting policy right."
+Four of five reproduce exactly after dedup and none match before it. Version-dedup is therefore **confirmed correct against an independent artifact**, not merely defensible.
 
-**Defensibility:** Both figures are derivable from the same `CaseFrame`. If a reviewer prefers the reference convention, it is a policy switch, not a rewrite. The divergence and its size (219 events, 6.0%) are stated in the report rather than reconciled away.
+**Revised reading of 3,648.** That total is a different quantity from the per-PT figures, computed over a different population or a different unit in the reference pipeline. We report 3,429 reaction events post-dedup and state the difference; we no longer claim the reference "does not dedupe," because its own per-PT numbers show it does.
+
+**Remaining discrepancy:** Drug ineffective, 54 against 53. Open — see E-011.
+
+---
+
+## D-018 — Case-level and event-level reaction counts are separate analyses
+
+**Decided:** `top_reactions` (unit `reaction_event`) and `top_reactions_by_case` (unit `case`) both exist. A sentence of the form "N cases of X were reported" must read the case-level one.
+
+**Why, when they currently return identical numbers:** On this dataset no case reports the same PT twice, so the two coincide for every PT. That is a property of *this data*, not a rule. The reference PADER's wording is explicitly case-level ("80 cases of acute kidney injury"), so matching its number with an event count would be correct by coincidence.
+
+**How the coincidence is held:** a test asserts the two agree on every shared PT. If a future dataset breaks it, the test fails and names the diverging term, rather than a report quietly attaching the word "cases" to an event count.
+
+**Cost:** one extra analysis. **Benefit:** the unit boundary is enforced rather than assumed, which is the same principle as D-011 applied one level up.
 
 ---
 
