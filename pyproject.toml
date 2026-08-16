@@ -20,3 +20,12 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
+# scripts/ holds throwaway diagnostics, not shipped library code.
+extend-exclude = ["scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "ISC"]
+# N999 fires on the repo directory name (Evidentia) rather than on any module
+# we control. The package itself is correctly named `evidentia`.
+ignore = ["N999"]
