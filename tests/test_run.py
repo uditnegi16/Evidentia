@@ -289,3 +289,198 @@ def test_case_index_csv_has_every_case(tmp_path):
         rows = list(csv.DictReader(fh))
     assert len(rows) == 1024
     assert "reactions" in rows[0]
+
+
+# --------------------------------------------------------------------------
+# Evaluation tiers wired into the runner
+# --------------------------------------------------------------------------
+
+
+CLEAN_JUDGE = json.dumps(
+    {
+        "overreach": [],
+        "interpretation": [],
+        "unit_errors": [],
+        "missing": [],
+        "notes": "No concerns.",
+    }
+)
+
+
+class EvalClient(EchoClient):
+    """Returns section prose for generation calls and rubric JSON for judge calls."""
+
+    def complete(self, messages: list[dict[str, str]], **kw: Any) -> LLMResponse:
+        self.calls += 1
+        is_judge = "auditing one section" in messages[0]["content"]
+        return LLMResponse(
+            content=CLEAN_JUDGE
+            if is_judge
+            else json.dumps(
+                {
+                    "prose": "During the interval the supplied data was reviewed.",
+                    "evidence_used": [],
+                    "flags": [],
+                }
+            ),
+            model=kw["model"],
+        )
+
+
+def test_selection_always_includes_flagged_sections():
+    from evidentia.grounding import GroundingIssue, GroundingResult
+    from evidentia.run import select_for_evaluation
+
+    flagged = GroundingResult(
+        section_id="a",
+        issues=[GroundingIssue(code="model_flag", severity="review", detail="x")],
+    )
+    clean = {k: GroundingResult(section_id=k) for k in "bcdefghij"}
+    results = {"a": flagged, **clean}
+
+    chosen = select_for_evaluation(results, sample=0.0)
+    assert chosen == ["a"], "flagged sections are never sampled out"
+
+    chosen = select_for_evaluation(results, sample=0.2)
+    assert "a" in chosen
+    assert 2 <= len(chosen) <= 4
+
+
+def test_selection_is_deterministic_for_a_given_seed():
+    from evidentia.grounding import GroundingResult
+    from evidentia.run import select_for_evaluation
+
+    results = {k: GroundingResult(section_id=k) for k in "abcdefghij"}
+    assert select_for_evaluation(results, 0.3, seed=7) == select_for_evaluation(
+        results, 0.3, seed=7
+    )
+
+
+def test_evaluation_is_off_by_default(tmp_path):
+    from evidentia.run import run_evaluation
+
+    assert run_evaluation(None, {}, {}, {}, mode="none", sample=1.0, client=None) == {}
+
+
+@needs_all
+def test_judge_runs_and_records_findings(tmp_path):
+    result = run(CONFIG, DATA, tmp_path, client=EvalClient(), evaluate="judge")
+    assert (tmp_path / "evaluation.json").exists()
+    summary = result.evaluation["summary"]
+    assert summary["sections_evaluated"] == 7
+    assert summary["judge_concerns"] == 0
+    assert result.manifest["evaluation"]["sections_evaluated"] == 7
+
+
+@needs_all
+def test_evaluation_never_blocks_the_render(tmp_path):
+    """Tier 3 concerns must not stop a report that tier 1 passed."""
+    concerned = json.dumps(
+        {
+            "overreach": ["During the interval the supplied data was reviewed."],
+            "interpretation": [],
+            "unit_errors": [],
+            "missing": ["everything"],
+            "notes": "Bad.",
+        }
+    )
+
+    class Harsh(EvalClient):
+        def complete(self, messages, **kw):
+            if "auditing one section" in messages[0]["content"]:
+                self.calls += 1
+                return LLMResponse(content=concerned, model=kw["model"])
+            return super().complete(messages, **kw)
+
+    result = run(CONFIG, DATA, tmp_path, client=Harsh(), evaluate="judge")
+    assert result.outputs, "advisory findings must not block the render"
+    assert result.evaluation["summary"]["judge_concerns"] > 0
+
+
+@needs_all
+def test_a_failing_evaluator_does_not_fail_the_run(tmp_path):
+    """An advisory tier that crashes would outrank tier 1, which is backwards."""
+
+    class Broken(EvalClient):
+        def complete(self, messages, **kw):
+            if "auditing one section" in messages[0]["content"]:
+                raise RuntimeError("judge exploded")
+            return super().complete(messages, **kw)
+
+    result = run(CONFIG, DATA, tmp_path, client=Broken(), evaluate="judge")
+    assert result.outputs
+    entries = result.evaluation["sections"].values()
+    assert all("judge_error" in e for e in entries)
+
+
+class CitingClient(EchoClient):
+    """Cites evidence, so sections come back clean rather than review-flagged.
+
+    EchoClient returns an empty evidence_used, which trips `no_evidence_cited`
+    on every section. That is correct behaviour, but it leaves no unflagged
+    sections for sampling to select from.
+    """
+
+    def complete(self, messages: list[dict[str, str]], **kw: Any) -> LLMResponse:
+        self.calls += 1
+        if "auditing one section" in messages[0]["content"]:
+            return LLMResponse(content=CLEAN_JUDGE, model=kw["model"])
+        # Cite a key this section actually declared. Hardcoding one key blocks
+        # any section that did not declare it — which is the gate working.
+        import re
+
+        found = re.findall(r'^\s{2}"(\w+)":', messages[1]["content"], re.MULTILINE)
+        return LLMResponse(
+            content=json.dumps(
+                {
+                    "prose": "During the interval the supplied data was reviewed.",
+                    "evidence_used": found[:1],
+                    "flags": [],
+                }
+            ),
+            model=kw["model"],
+        )
+
+
+@needs_all
+def test_sampling_limits_evaluation_cost(tmp_path):
+    """sample=0 evaluates only what tier 1 already flagged."""
+    result = run(
+        CONFIG,
+        DATA,
+        tmp_path,
+        client=CitingClient(),
+        evaluate="judge",
+        evaluate_sample=0.0,
+    )
+    flagged = set(result.needs_review)
+    evaluated = set(result.evaluation.get("sections", {}))
+    assert evaluated == flagged
+    assert len(evaluated) < 7, "some sections should be clean under CitingClient"
+
+
+@needs_all
+def test_full_sample_evaluates_every_section(tmp_path):
+    result = run(
+        CONFIG,
+        DATA,
+        tmp_path,
+        client=CitingClient(),
+        evaluate="judge",
+        evaluate_sample=1.0,
+    )
+    assert result.evaluation["summary"]["sections_evaluated"] == 7
+
+
+@needs_all
+def test_flagged_sections_are_evaluated_even_at_zero_sample(tmp_path):
+    """The policy that makes sampling safe: flags are never sampled out."""
+    result = run(
+        CONFIG,
+        DATA,
+        tmp_path,
+        client=EchoClient(),
+        evaluate="judge",
+        evaluate_sample=0.0,
+    )
+    assert set(result.evaluation["sections"]) == set(result.needs_review)

@@ -27,6 +27,7 @@ trail. Roughly 40 seconds and about 15,000 tokens.
 
 ```bash
 streamlit run review_app.py                              # human review UI
+python -m evidentia.run --evaluate full --evaluate-sample 0.3   # advisory tiers 2 and 3
 python -m evidentia.run --config configs/psur_lite.yaml --out outputs/psur   # second report type
 pytest -q                                                # 203 tests
 ```
@@ -261,6 +262,17 @@ verbatim, and quotes not found in the prose set `quotes_verified=False`. An unpa
 judge response returns "no evaluation performed" rather than an empty-and-therefore-clean
 result — failing open would let a broken evaluator look like a pass.
 
+Tiers 2 and 3 run behind `--evaluate {cross,judge,full}` with
+`--evaluate-sample`. **Sections already flagged by tier 1 are never sampled out** —
+spending budget on sections nothing has questioned while skipping one that raised a flag
+would invert the point. Sampling is seeded, so a run is reproducible. Results land in
+`evaluation.json` and a summary in `manifest.json`.
+
+Both tiers are advisory in code, not just in description: a tier-3 finding does not stop
+a render, and an evaluator that *crashes* does not fail the run — it records the error
+and continues. An advisory tier able to halt a report would outrank the deterministic
+gate, which is backwards.
+
 **Fleet metrics** from `manifest.json`, which every run writes: ungrounded-number rate,
 sections needing review, output-mode degradation, tokens, and a `dataset_sha256` +
 prompt/packet hash per section so any report can be attributed and reproduced.
@@ -354,9 +366,9 @@ dangerous than a crash.
   here. The config says so.
 - **Review state is a JSON file.** No auth, no multi-user, no audit of who changed what and
   when. Fine for a prototype; a real deployment needs an append-only review log.
-- **Cross-check and judge are not wired into the default run.** They are implemented and
-  tested but invoked explicitly, because running them on every section would triple token
-  cost for an advisory signal.
+- **Cross-check and judge are off by default.** They are wired into the runner behind
+  `--evaluate` and cost roughly one extra call per section per tier, so running them
+  unconditionally would triple token spend for an advisory signal.
 - **Strict structured output is provider-dependent.** Groq strict mode is documented for
   `gpt-oss` models only and has been reported to fail on them; the client degrades
   strict → schema → json_object and records which rung produced each section.
