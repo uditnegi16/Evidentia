@@ -83,6 +83,11 @@ def test_deduped_reaction_events(frame):
 
 @needs_data
 def test_data_quality_issues_are_all_surfaced(frame):
+    """Regression net over the whole quality layer.
+
+    If a future change starts swallowing an issue silently, this fails rather
+    than the report quietly becoming less honest.
+    """
     codes = {i.code for i in frame.validation.issues}
     assert codes == {
         "superseded_versions_dropped",
@@ -93,8 +98,11 @@ def test_data_quality_issues_are_all_surfaced(frame):
         "outcome_misaligned",
     }
     counts = {i.code: i.count for i in frame.validation.issues}
+    assert counts["superseded_versions_dropped"] == 44
+    assert counts["age_unit_unrecognised"] == 3
     assert counts["age_unavailable"] == 86
     assert counts["duplicate_flag_present"] == 197
+    assert counts["country_disagreement"] == 8
     assert counts["outcome_misaligned"] == 6
 
 

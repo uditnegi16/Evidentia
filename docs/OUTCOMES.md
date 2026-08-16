@@ -27,7 +27,7 @@ modify live.
 | # | Phase | Output | Status |
 |---|---|---|---|
 | 0 | Scaffold + data profiling | Repo, venv, package skeleton, `scripts/profile_data.py` | **done** |
-| 1 | Ingest, validate, dedupe | `ingest.py`, validation report | in progress |
+| 1 | Ingest, validate, dedupe | `ingest.py`, `contracts.py`, 28 tests | **done** |
 | 2 | Analysis registry | `analyses/`, evidence contracts, pytest suite | not started |
 | 3 | Config schema and assembler | `configs/pader_fda.yaml`, `assembler.py` | not started |
 | 4 | Section generation | `generate.py`, `prompts/*.jinja` | not started |
@@ -67,6 +67,33 @@ hospitalisation 504, disabling 46, congenital anomaly 8, other 945. Sum 1,682 ag
 
 **Outcome vocabulary after split:** recovered/resolved 1,347, unknown 1,135,
 not recovered/ongoing 569, recovering/resolving 420, fatal 137, recovered with sequelae 34.
+
+---
+
+## Phase 1 verified outputs
+
+Produced by `python -m evidentia.ingest`, all pinned by tests.
+
+| Output | Value |
+|---|---|
+| Source SHA-256 | `369476426a406d30...` |
+| Raw rows | 1,068 |
+| Cases after version-dedup | 1,024 |
+| Superseded rows dropped | 44 |
+| Reporting period | 2024-12-27 to 2025-12-26 |
+| Reaction events, raw split | 3,648 (matches reference PADER) |
+| Reaction events, post-dedup | **3,429** (reported figure, see D-017) |
+| Events removed by dedup | 219 (6.0%) |
+
+**Quality issues surfaced (post-dedup, case-level):** superseded rows dropped 44,
+corrupt age unit 3, age unavailable 86, duplicate flag 197, country disagreement 8,
+reaction/outcome misalignment 6.
+
+No `outcome_broadcast` issue fired — no row pairs a single outcome with multiple
+reactions, so the broadcast branch is unit-tested but unused on this dataset.
+
+Test suite: 28 passing. 13 ground-truth assertions (skip automatically without the
+dataset, so CI runs green with no data), 15 unit tests requiring no data.
 
 ---
 

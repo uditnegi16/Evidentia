@@ -103,3 +103,17 @@ the section or inventing content. Expectedness / labelledness is out of scope.
 **Cause:** Assumed the file format stated in the brief.
 **Fix:** Added `*.xlsx`, `*.xls`, `data/`, `*.egg-info/`, `build/`, `dist/`. Untracked egg-info with `git rm -r --cached`.
 **Carry-over:** Loader now dispatches on file extension and accepts both CSV and Excel, since the brief and the delivered artifact disagreed.
+
+## E-007 — Post-dedup reaction count does not match the reference PADER
+**Phase:** 1 (ingest)
+**Symptom:** Reference PADER reports 3,648 reaction events. Our post-dedup count is 3,429.
+**Cause:** Not a defect. 3,648 is exactly our *pre*-dedup figure, so the reference pipeline counts every row including superseded report versions. The 44 superseded rows carry 219 reaction events.
+**Fix:** None applied. We report 3,429 and assert 3,648 separately as proof the comma-split model matches theirs. Divergence documented as D-017.
+**Carry-over:** README limitation and a likely live-interview question. Prepared answer: the split is validated against the reference; only the dedup policy differs, and it is a config-level policy rather than a code path.
+
+## E-008 — Branch already existed on re-run
+**Phase:** 1 (setup)
+**Symptom:** `git checkout -b phase-1-ingest` failed with "a branch named ... already exists".
+**Cause:** Branch created in an earlier session.
+**Fix:** `git checkout phase-1-ingest`. Untracked extracted files are unaffected by branch switching.
+**Carry-over:** None.

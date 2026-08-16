@@ -193,6 +193,20 @@ Kept as a running record so any decision can be defended or revisited.
 
 ---
 
+## D-017 — Report 3,429 reaction events, not the reference's 3,648
+
+**Decided:** The report quotes **3,429** reaction events (post version-dedup). The raw comma-split figure of 3,648 is retained in the validation report and asserted in a test, but is not the reported number.
+
+**The tension:** The supplied reference PADER states 3,648, which is exactly the pre-dedup count. The reference pipeline therefore appears not to collapse superseded report versions.
+
+**Why we diverge:** 44 rows are superseded revisions of 41 cases (D-012). They carry 219 reaction events. Counting them means counting a case's reactions twice because the case was later revised. That is double-counting, not additional safety information.
+
+**Why we still assert 3,648:** Reproducing it from raw data proves the comma-split model matches the reference pipeline's. The split is validated; only the dedup policy differs. Keeping both numbers separates "is my parsing right" from "is my counting policy right."
+
+**Defensibility:** Both figures are derivable from the same `CaseFrame`. If a reviewer prefers the reference convention, it is a policy switch, not a rewrite. The divergence and its size (219 events, 6.0%) are stated in the report rather than reconciled away.
+
+---
+
 ## Open questions
 
 *(all Phase 0 open questions resolved by profiling — see D-011 through D-016)*
