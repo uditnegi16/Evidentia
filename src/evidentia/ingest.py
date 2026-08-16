@@ -325,7 +325,7 @@ def _explode_reactions(
 
         base = {k: d.get(k) for k in carry if k in d}
         base[cid] = d[cid]
-        for pos, (pt, outcome) in enumerate(zip(pts, aligned)):
+        for pos, (pt, outcome) in enumerate(zip(pts, aligned, strict=True)):
             records.append(
                 {
                     **base,

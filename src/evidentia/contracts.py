@@ -63,8 +63,10 @@ class ValidationReport(BaseModel):
             f"unique cases      {self.unique_cases}",
             f"superseded rows   {self.rows_dropped_as_superseded}",
             f"period            {self.period_start} -> {self.period_end}",
-            f"reaction events   {self.reaction_events_raw} raw / "
-            f"{self.reaction_events_deduped} deduped",
+            (
+                f"reaction events   {self.reaction_events_raw} raw / "
+                f"{self.reaction_events_deduped} deduped"
+            ),
             "",
             "issues:",
         ]
