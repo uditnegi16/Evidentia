@@ -188,8 +188,19 @@ class Evaluator:
 
     def __init__(self, generator: Generator, client: LLMClient | None = None) -> None:
         self.generator = generator
-        self.client = client or generator.client
+        self._explicit_client = client
         self.validator = GroundingValidator()
+
+    @property
+    def client(self) -> LLMClient:
+        """Resolve lazily.
+
+        On a CLI run no client is passed; the Generator builds one on first use.
+        Binding at construction time captured None and the judge crashed while
+        cross-check worked, because cross-check goes through generate() and
+        triggers that construction.
+        """
+        return self._explicit_client or self.generator._client()
 
     def cross_check(
         self,

@@ -220,3 +220,29 @@ def test_judge_uses_zero_temperature():
     ev, client = evaluator([CLEAN])
     ev.judge(packet(), section())
     assert client.calls[0]["temperature"] == 0.0
+
+
+def test_judge_works_when_the_generator_owns_the_client():
+    """CLI runs pass no client; the Generator builds one lazily.
+
+    Binding the client at Evaluator construction captured None, so the judge
+    crashed while cross-check worked — cross-check goes through generate() and
+    triggers the lazy build (E-020).
+    """
+    from evidentia.evaluate import Evaluator
+
+    client = ScriptedClient([CLEAN])
+    gen = Generator(ModelConfig(), client=client)
+    ev = Evaluator(gen)  # no client passed
+    assert ev.judge(packet(), section()).clean
+
+
+def test_explicit_client_still_wins():
+    from evidentia.evaluate import Evaluator
+
+    explicit = ScriptedClient([CLEAN])
+    other = ScriptedClient([])
+    ev = Evaluator(Generator(ModelConfig(), client=other), explicit)
+    ev.judge(packet(), section())
+    assert len(explicit.calls) == 1
+    assert other.calls == []
