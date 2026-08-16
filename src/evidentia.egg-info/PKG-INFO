@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: evidentia
+Version: 0.1.0
+Summary: Config-driven engine for controlled, traceable regulatory reports
+Requires-Python: >=3.11
+Requires-Dist: pandas>=2.2
+Requires-Dist: pydantic>=2.9
+Requires-Dist: PyYAML>=6.0
+Requires-Dist: Jinja2>=3.1
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: groq>=0.11
+Requires-Dist: streamlit>=1.39
+Requires-Dist: python-docx>=1.1
+Requires-Dist: markdown>=3.7
+Requires-Dist: pytest>=8.3
+Requires-Dist: ruff>=0.7
