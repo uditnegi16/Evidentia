@@ -692,17 +692,57 @@ def safety_actions(frame: CaseFrame) -> EvidenceItem:
     )
 
 
+ISSUE_LABELS = {
+    "superseded_versions_dropped": "rows removed as superseded report versions",
+    "age_unit_unrecognised": "cases with an uninterpretable age unit",
+    "age_unit_missing": "cases with an age but no unit",
+    "age_implausible": "cases with an age outside 0-120 years",
+    "age_unavailable": "cases with no usable age",
+    "duplicate_flag_present": "cases carrying the duplicate flag, retained",
+    "country_disagreement": "cases where the two country fields disagree",
+    "outcome_misaligned": "reaction events with no aligned outcome",
+    "outcome_broadcast": "rows with one outcome applied to several reactions",
+    "sex_unavailable": "cases with no recorded sex",
+    "date_unparsed": "rows with an unparseable report date",
+    "multirow_not_version": "multi-row cases not explained by versioning",
+}
+
+
 @analysis("data_quality", "Data quality findings", unit="case")
 def data_quality(frame: CaseFrame) -> EvidenceItem:
     """Validation findings from ingest, promoted to citable evidence.
 
-    Limitations stated in the report trace to the validator, not to the model's
-    impression of the data.
+    Labels are written for a reader, not for a log. An earlier version passed
+    the raw issue codes through and the model dutifully wrote sentences like
+    "the duplicate_flag_present warning was raised", because that was the only
+    vocabulary it had. The model can only be as readable as its packet.
     """
     v = frame.validation
     buckets = [
         Bucket(
-            label=f"{i.code} ({i.severity})",
+            label="rows in source file before deduplication",
+            count=v.raw_rows,
+            pct=None,
+        ),
+        Bucket(
+            label="cases after collapsing superseded report versions",
+            count=v.unique_cases,
+            pct=None,
+        ),
+        Bucket(
+            label="reaction events before deduplication",
+            count=v.reaction_events_raw,
+            pct=None,
+        ),
+        Bucket(
+            label="reaction events after deduplication",
+            count=v.reaction_events_deduped,
+            pct=None,
+        ),
+    ]
+    buckets += [
+        Bucket(
+            label=ISSUE_LABELS.get(i.code, i.code.replace("_", " ")),
             count=i.count,
             pct=_pct(i.count, frame.n_cases),
         )

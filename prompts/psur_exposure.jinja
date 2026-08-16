@@ -1,0 +1,31 @@
+{# Estimated Patient Exposure - an explicit negative about denominators. #}
+Section: Estimated Patient Exposure
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Framework: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+No patient exposure data was supplied with this dataset. State that exposure
+could not be estimated for the interval, and that reporting rates, incidence
+and frequency per patient-year therefore cannot be calculated.
+
+You may state the number of reports received during the interval, described
+as a count of reports and never as a rate or as a proportion of patients
+treated.
+
+Name what would be needed: sales or prescription volume, treatment duration
+assumptions, and a defined denominator population. Write nothing else.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

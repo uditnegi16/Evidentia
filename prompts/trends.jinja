@@ -1,0 +1,29 @@
+{# Trends and Important Observations - temporal patterns, stated neutrally. #}
+Section: Trends and Important Observations
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Describe how case volume and leading reactions moved across the interval.
+
+Every movement must be written with its figures attached. Write "reports of X
+numbered N in month A and M in month B", never "X increased notably". A count
+that goes up is a count that went up; it is not a trend, an emerging signal, a
+concern, or evidence of anything.
+
+Note the partial first and last months before discussing either.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

@@ -1,0 +1,28 @@
+{# Serious Cases and 15-Day Alert Reports - expedited reporting population. #}
+Section: Serious Cases and 15-Day Alert Reports
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Report the serious case count, the number meeting expedited criteria, which
+seriousness criteria were met and how often, and the leading reactions among
+serious cases.
+
+State that expectedness could not be assessed because no product label was
+supplied, and that serious and expedited populations were counted separately
+even though they nearly coincide here.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

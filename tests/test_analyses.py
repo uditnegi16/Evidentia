@@ -380,3 +380,91 @@ def test_prompt_dict_omits_none_value():
         ),
     )
     assert "value" not in item.to_prompt_dict()
+
+
+# --------------------------------------------------------------------------
+# Packet figures the model may legitimately quote (E-015)
+# --------------------------------------------------------------------------
+
+
+def test_numeric_claims_harvest_bucket_labels():
+    """A band called "65-74" puts 65 and 74 in front of the model."""
+    item = EvidenceItem(
+        key="age_bands",
+        label="Age",
+        kind="distribution",
+        buckets=[Bucket(label="65-74", count=300), Bucket(label="85+", count=90)],
+        provenance=Provenance(
+            unit="case", method="m", source_columns=[], n_contributing=390
+        ),
+    )
+    claims = item.numeric_claims()
+    assert {65.0, 74.0, 85.0} <= claims
+
+
+def test_numeric_claims_harvest_month_labels():
+    item = EvidenceItem(
+        key="monthly_case_volume",
+        label="Monthly",
+        kind="timeseries",
+        buckets=[Bucket(label="2025-03", count=88)],
+        provenance=Provenance(
+            unit="case", method="m", source_columns=[], n_contributing=88
+        ),
+    )
+    assert {2025.0, 3.0, 88.0} <= item.numeric_claims()
+
+
+def test_n_contributing_is_claimable_and_visible_to_the_model():
+    """Withholding it made a model reconstruct it by subtraction."""
+    item = EvidenceItem(
+        key="age_bands",
+        label="Age",
+        kind="distribution",
+        buckets=[Bucket(label="unknown", count=86)],
+        provenance=Provenance(
+            unit="case",
+            method="m",
+            source_columns=[],
+            n_contributing=938,
+            denominator=1024,
+        ),
+    )
+    assert 938.0 in item.numeric_claims()
+    assert item.to_prompt_dict()["provenance"]["n_contributing"] == 938
+
+
+def test_label_harvesting_does_not_admit_arbitrary_numbers():
+    item = EvidenceItem(
+        key="k",
+        label="L",
+        kind="distribution",
+        buckets=[Bucket(label="65-74", count=300)],
+        provenance=Provenance(
+            unit="case", method="m", source_columns=[], n_contributing=300
+        ),
+    )
+    claims = item.numeric_claims()
+    assert 999.0 not in claims
+    assert 1024.0 not in claims
+
+
+@needs_data
+def test_age_known_count_is_available_without_arithmetic(store):
+    assert 938.0 in store.get("age_bands").numeric_claims()
+
+
+@needs_data
+def test_data_quality_labels_are_readable_not_internal_codes(store):
+    """The model can only be as readable as its packet.
+
+    Raw issue codes produced prose like "the duplicate_flag_present warning was
+    raised", which is log output, not a regulatory sentence.
+    """
+    labels = [b.label for b in store.get("data_quality").buckets]
+    assert labels, "data quality should report findings"
+    for label in labels:
+        assert "_" not in label, f"internal code leaked into the packet: {label}"
+        assert "(" not in label, f"severity marker leaked into the packet: {label}"
+    assert any("duplicate flag" in x for x in labels)
+    assert any("superseded" in x for x in labels)

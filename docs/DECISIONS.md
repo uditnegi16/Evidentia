@@ -232,3 +232,90 @@ Four of five reproduce exactly after dedup and none match before it. Version-ded
 *(all Phase 0 open questions resolved by profiling — see D-011 through D-016)*
 
 - Reaction and outcome lists align positionally in 99.4% of rows. The 0.6% that do not need an explicit handling rule rather than a silent `zip()` truncation. To be decided in Phase 2.
+
+## D-019 — Full case-ID provenance, with an explicit prompt projection
+
+**Decided:** Every `EvidenceItem` carries the complete list of contributing case IDs. `to_prompt_dict()` is a projection that strips them.
+
+**Alternative rejected:** counts only, with a re-query function for tracing.
+
+**Why:**
+1. Provenance is only capturable at compute time. Recovering it later assumes the data has not moved and the code has not changed; an audit trail you must recompute is not an audit trail.
+2. Asymmetric reversibility — data you have can always be dropped; data never stored cannot be recovered.
+3. Cost is not real: 1,024 integers is roughly 8 KB.
+4. Two consumers, two shapes, one source of truth. The audit record and the model payload have different requirements.
+5. Having the IDs and deliberately excluding them is a demonstrable context-engineering decision. Counts-only means the choice was never available.
+
+**Enforcement:** a test asserts structurally that no case ID appears in any prompt payload, and that `evidence.json` retains all of them.
+
+---
+
+## D-020 — Fail at config load, never at render
+
+**Decided:** Unknown analysis names, generated sections with no prompt, missing prompt files, generated sections declaring no evidence, and duplicate section IDs all raise during `load_config`.
+
+**Why:** A typo discovered after six paid LLM calls is strictly worse than one discovered in the first millisecond. The last case matters most: a generated section with an empty packet plus an instruction to write is precisely the condition under which a model invents content.
+
+---
+
+## D-021 — Structured-output fallback ladder
+
+**Decided:** `strict` → `schema` → `json_object`, with the rung that succeeded recorded on every section and surfaced as a review-severity grounding issue when it is not `strict`.
+
+**Why:** Strict constrained decoding is the strongest guarantee available but it is a provider feature, documented for `gpt-oss` models only and reported to fail on them. Betting the pipeline on one provider feature was a design flaw. Auth failures and rate limits are excluded from the ladder — retrying those burns quota and hides the real problem.
+
+---
+
+## D-022 — Grounding blocks; humans escalate
+
+**Decided:** Ungrounded numbers, asserted forbidden phrases and undeclared evidence **block the render**. Model flags, negated forbidden phrases, over-length and degraded output mode **escalate to review**. A human may approve prose; a human may not approve a fabricated number.
+
+**Why:** These are different authorities. Wording is a matter of judgement, arithmetic is not. Collapsing them would make approval a way to launder a fabrication.
+
+---
+
+## D-023 — Negation-aware forbidden phrases, downgraded not permitted
+
+**Decided:** A forbidden phrase inside a denial is recorded as `forbidden_phrase_negated` at review severity rather than blocking.
+
+**Why:** The PSUR `exposure` section is *instructed* to say reporting rates cannot be calculated. A naive substring match blocked the exact sentence the rules demanded. A gate that punishes correct compliance trains reviewers to ignore it.
+
+**Two constraints learned the hard way (E-016):** the matched phrase is excluded from the window, because "no safety concerns" begins with "no" and was excusing itself; and bare "no", "none", "never" are not markers, being too common in regulatory prose to distinguish a denial of this claim from a denial of something nearby.
+
+**Never permitted, only downgraded.** The reviewer still sees that the phrase appeared, with surrounding context.
+
+---
+
+## D-024 — Rate limits are retried; the provider's stated wait is obeyed
+
+**Decided:** 429 responses retry up to four times, parsing "try again in Xs" from the error rather than guessing.
+
+**Why:** A seven-section report exceeds the free tier's 8,000 tokens per minute. Treating that as a failure would make the pipeline unusable for exactly the reader most likely to run it from the README.
+
+---
+
+## D-025 — Partial runs render nothing
+
+**Decided:** `--sections` writes packets, sections and grounding results, stamps the manifest `PARTIAL — N of M generated sections; not a report`, and produces no document.
+
+**Alternative rejected:** placeholder text for ungenerated sections.
+
+**Why:** An incomplete regulatory report that looks complete is a worse artifact than a crash. Refusing is the safe direction.
+
+---
+
+## D-026 — Evaluation tiers have structurally unequal authority
+
+**Decided:** `CrossCheckResult` has no `passed` attribute. `JudgeResult` has no `approved`, `passed` or `score` field. Tests assert their absence.
+
+**Why:** An evaluator that can approve is an evaluator that can hallucinate approval. Tier 2 detects *disagreement, not correctness* — two models can agree and both be wrong. Tier 3's own output is verified: it must quote offending sentences verbatim, and an unparseable response returns "no evaluation performed" rather than an empty-and-therefore-clean result.
+
+---
+
+## D-027 — Packet labels are written for a reader
+
+**Decided:** `data_quality` buckets carry human-readable labels, not internal issue codes.
+
+**Why:** Passing raw codes through produced prose like "the duplicate_flag_present warning was raised for 197 cases". The model can only be as readable as its packet vocabulary. A test asserts no underscore or severity marker survives into a label.
+
+---

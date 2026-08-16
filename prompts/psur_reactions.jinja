@@ -1,0 +1,32 @@
+{# Overview of Adverse Reactions - interval data at Preferred Term level. #}
+Section: Overview of Adverse Reactions
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Framework: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Present the reactions reported during the interval: the leading Preferred
+Terms by distinct case, the leading terms among serious reports, and the
+distribution of outcomes.
+
+State once that tabulation is at Preferred Term level because the source data
+carries no System Organ Class field, and once that all figures are interval
+figures because no previous reporting period was supplied for cumulative
+comparison.
+
+Be explicit about units: some figures count distinct cases and some count
+reaction events. Each item in the packet declares which.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

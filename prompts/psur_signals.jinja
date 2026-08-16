@@ -1,0 +1,34 @@
+{# Signal Evaluation - observations only, no signal classification. #}
+Section: Signal Evaluation
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Framework: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Describe how report volume and leading reaction terms moved across the
+interval, and the size of the expedited-reporting population.
+
+Attach figures to every movement you describe. Write "reports of X numbered N
+in month A and M in month B".
+
+Do not classify any observation as a signal, a potential signal, a validated
+signal, a safety concern or an emerging risk. Signal validation requires a
+qualified assessor plus reference data that were not supplied here. Your task
+is to lay out what the interval data shows so that an assessor can evaluate
+it. Present the observations and stop.
+
+Note that the first and last months of the interval are partial.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

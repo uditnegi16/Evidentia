@@ -1,0 +1,32 @@
+{# Narrative Summary and Analysis - the report's main analytical section. #}
+Section: Narrative Summary and Analysis
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Summarise the safety information received during the interval. Open with the
+period and the total case count, then the seriousness split, then the most
+frequently reported reactions and the outcome picture.
+
+Distinguish three registers and keep them separate:
+  observed     what the data records, e.g. "80 cases reported acute kidney injury"
+  derived      what follows arithmetically, e.g. "the most frequently reported reaction"
+  interpreted  reserved for a qualified reviewer; do not write in this register
+
+Do not characterise the overall safety profile. Do not state whether the data
+warrants action.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

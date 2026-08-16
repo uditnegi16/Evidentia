@@ -10,15 +10,15 @@ modify live.
 
 | Criterion | Answered by | Status |
 |---|---|---|
-| AI fundamentals | D-002 split: LLM writes, pandas computes | planned |
-| Context engineering | `assembler.py` — per-section scoped packet | planned |
-| Prompt design | `prompts/` Jinja templates, one per section | planned |
-| Architecture | 8 modules, single responsibility each | planned |
-| Agent/tool judgment | D-003 explicit rejection of agents/RAG | planned |
-| Grounding | `grounding.py` number-membership gate | planned |
-| Evaluation | D-009 three-tier asymmetric evaluation | planned |
-| Generalization | D-008 second report type, zero code change | planned |
-| Execution | One command regenerates the report | planned |
+| AI fundamentals | D-002 split: LLM writes, pandas computes; 0 numbers from the model | **done** |
+| Context engineering | 20 analyses exist, no section sees more than 7; D-019 projection | **done** |
+| Prompt design | 12 Jinja templates; every packet written to disk per run | **done** |
+| Architecture | 9 modules, frozen contracts between stages | **done** |
+| Agent/tool judgment | D-003 explicit rejection of agents/RAG, stated in README | **done** |
+| Grounding | 253 claims checked, 0 ungrounded; 4 live catches documented | **done** |
+| Evaluation | 3 tiers, structurally unequal authority (D-026) | **done** |
+| Generalization | PSUR-lite: 0 shared sections, 18/18 analyses reused, 0 Python | **done** |
+| Execution | `python -m evidentia.run` → md, html, docx in ~40s | **done** |
 
 ---
 
@@ -28,15 +28,15 @@ modify live.
 |---|---|---|---|
 | 0 | Scaffold + data profiling | Repo, venv, package skeleton, `scripts/profile_data.py` | **done** |
 | 1 | Ingest, validate, dedupe | `ingest.py`, `contracts.py`, 28 tests | **done** |
-| 2 | Analysis registry | `analyses/`, `evidence.py`, 60 tests | **done** |
-| 3 | Config schema and assembler | `configs/pader_fda.yaml`, `assembler.py` | not started |
-| 4 | Section generation | `generate.py`, `prompts/*.jinja` | not started |
-| 5 | Grounding validator | `grounding.py` | not started |
-| 6 | Human review | `review_app.py`, `review.json` | not started |
-| 7 | Renderers | `render.py` — markdown, html, docx | not started |
-| 8 | Evaluation layer | `eval/`, tier 1-3 checks | not started |
-| 9 | V1 second report type | `configs/psur_lite.yaml` | not started |
-| 10 | README, diagram, packaging | `README.md`, Mermaid diagram, zip | not started |
+| 2 | Analysis registry | `analyses/` (20), `evidence.py` | **done** |
+| 3 | Config schema and assembler | `config.py`, `assembler.py`, `configs/pader_fda.yaml` | **done** |
+| 4 | Section generation | `generate.py`, 7 Jinja prompts, Groq fallback ladder | **done** |
+| 5 | Grounding validator | `grounding.py` | **done** |
+| 6 | Runner and renderers | `run.py`, `render.py`, md/html/docx | **done** |
+| 7 | Human review | `review_app.py`, `review.json`, approval gate | **done** |
+| 8 | Evaluation layer | `evaluate.py`, tiers 2 and 3 | **done** |
+| 9 | V1 second report type | `configs/psur_lite.yaml` + 5 prompts, zero Python | **done** |
+| 10 | README, diagram, packaging | `README.md` with Mermaid diagram | **done** |
 
 ---
 
@@ -152,13 +152,63 @@ Test suite: 60 passing.
 
 ---
 
-## Run results
 
-*(to be filled after first successful end-to-end run — token counts, wall time, tier 1-3
-pass rates, sections flagged)*
+## Final run — PADER
 
----
+`python -m evidentia.run`
+
+| | |
+|---|---|
+| Sections generated | 7 |
+| Sections rendered deterministically | 2 |
+| Numeric claims checked | **253** |
+| Ungrounded | **0** |
+| Sections needing review | 1 (`reaction_analysis`, over-length by 22 words) |
+| Output mode | strict on every section |
+| Outputs | `report.md`, `report.html`, `report.docx` |
+| Status | DRAFT — not human approved |
+
+Per-section: narrative_summary 20/20 · summary_analysis_of_cases 59/59 ·
+reaction_analysis 102/102 · serious_cases_alerts 18/18 · trends_observations 44/44 ·
+history_of_actions 0/0 · data_limitations 10/10.
+
+## Final run — PSUR-lite
+
+`python -m evidentia.run --config configs/psur_lite.yaml --out outputs/psur`
+
+6 generated, 2 deterministic, 118 claims checked, 0 ungrounded. One review flag:
+`exposure` used "reporting rate" inside an instructed denial, correctly downgraded
+rather than blocked (D-023).
+
+## Generalisation, measured
+
+| | PADER | PSUR-lite |
+|---|---|---|
+| Sections | 9 | 8 |
+| Shared section IDs | — | **0** |
+| Analyses required | 20 | 18 |
+| Analyses reused | — | **18** |
+| New Python | — | **0** |
+
+## Test suite
+
+203 passing. Roughly 130 run with no dataset and no API key, because the deterministic
+layer holds no LLM calls and the client is injected behind a Protocol.
+
+| File | Covers |
+|---|---|
+| `test_ingest.py` | ground-truth figures, dedup, age normalisation, reaction explosion |
+| `test_analyses.py` | 20 analyses, the prompt projection boundary, packet claims |
+| `test_config.py` | scoping, load-time validation, the real PADER config |
+| `test_generate.py` | schema shape, retry, fallback ladder, rate-limit backoff |
+| `test_grounding.py` | real model output as fixture, fabrication detection, negation |
+| `test_run.py` | end-to-end, audit trail, approval gate, partial runs |
+| `test_evaluate.py` | tier 2 and 3 authority boundaries |
+| `test_generalization.py` | the zero-new-code claim, made falsifiable |
 
 ## Known limitations
 
-*(to be filled — this section becomes the README's limitations section verbatim)*
+Maintained in the README under "Known limitations" and kept in sync with this file.
+Headline items: the unexplained Drug ineffective 54-vs-53 discrepancy (E-011, left open);
+no SOC field so no SOC grouping; expectedness out of scope with no product label;
+197 duplicate-flagged cases retained rather than dropped; grounding is numeric only.

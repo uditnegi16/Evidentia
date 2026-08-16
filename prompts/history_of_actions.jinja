@@ -1,0 +1,30 @@
+{# History of Safety-Related Actions - an explicit negative. #}
+Section: History of Safety-Related Actions
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+The packet contains an explicit statement that no safety-related action data
+was supplied. Report that fact in two or three sentences.
+
+Name the categories that would have been covered had data been available:
+labelling changes, regulatory communications, safety-related studies, additional
+monitoring and risk-minimisation measures. Then state that the absence of
+supplied data is not evidence that no actions were taken.
+
+Write nothing else. Do not pad this section.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

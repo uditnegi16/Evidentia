@@ -1,0 +1,30 @@
+{# Reaction / Adverse Event Analysis - MedDRA Preferred Term level. #}
+Section: Reaction / Adverse Event Analysis
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Analyse the reactions reported during the interval: the most frequent terms,
+the most frequent among serious cases, the outcome distribution, and any
+difference visible between sexes.
+
+State explicitly, once, that analysis is at Preferred Term level because the
+dataset carries no System Organ Class field.
+
+Be precise about units. Case-level figures and reaction-event-level figures are
+both present in the packet and each item declares which it is.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

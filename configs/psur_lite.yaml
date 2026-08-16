@@ -1,0 +1,200 @@
+# PSUR-lite — a second report type, defined entirely in configuration.
+#
+# THE POINT OF THIS FILE
+#
+# Adding it touched no Python. Different sections, different order, different
+# section rules, a different voice, a different model temperature, a different
+# set of forbidden phrases — all expressed as data. Every analysis it needs was
+# already registered for the PADER and is reused unchanged.
+#
+#     git log --stat  →  this config and its prompts, zero .py files
+#
+# WHAT THIS IS NOT
+#
+# It is not a valid PSUR. A real ICH E2C(R2) PBRER requires exposure denominators,
+# clinical trial data, literature review and a benefit-risk evaluation, none of
+# which exist in the supplied dataset. Sections that would need that data are
+# present and explicitly state that it was not supplied, which is the same
+# discipline the PADER applies to History of Actions.
+#
+# It exists to answer one question: if a new report type arrives, how much of the
+# system survives? Answer: all of it.
+
+report_type: PSUR-lite
+title: Periodic Safety Update Report (simplified)
+regulatory_basis: ICH E2C(R2) structure, applied to a spontaneous-report dataset
+
+product:
+  name: Bisoprolol
+  application_number: B-1
+  sponsor: Dev Pharma Client
+  indication: hypertension and heart failure
+  unknown_fields:
+    - international birth date
+    - patient exposure denominators
+    - clinical trial safety data
+    - literature review
+    - product label / CCDS
+    - previous reporting period data
+
+model:
+  provider: groq
+  name: openai/gpt-oss-120b
+  # A PSUR narrative is more discursive than a PADER tabulation, so this report
+  # type carries its own generation settings rather than inheriting a global one.
+  temperature: 0.1
+  max_tokens: 4000
+  reasoning_effort: low
+  structured_output: strict
+  seed: 7
+  cross_check_model: llama-3.3-70b-versatile
+
+output_formats:
+  - markdown
+  - html
+
+global_rules:
+  - Use only the figures provided in the evidence packet. Do not calculate,
+    estimate, extrapolate or round any number that is not given.
+  - Every number you write must appear verbatim in the evidence packet.
+  - Respect the unit of count on each item. Never compare or combine figures
+    carrying different units.
+  - This report covers spontaneous post-marketing reports only. No exposure
+    denominator is available, so no reporting rate, incidence or frequency per
+    patient-year can be stated.
+  - State observations, not conclusions. Do not assert or deny causality.
+  - Where the packet does not establish something, say it was not established.
+  - Write in neutral regulatory prose.
+
+# A superset of the PADER list. PSURs invite benefit-risk language, so the
+# phrases that would overstate it are blocked explicitly.
+forbidden_phrases:
+  - no safety concerns
+  - no new safety concerns
+  - confirmed signal
+  - safety signal was identified
+  - causally related
+  - caused by
+  - proven safe
+  - demonstrates that
+  - proves that
+  - it is clear that
+  - reassuring
+  - benefit-risk balance remains favourable
+  - benefit-risk balance remains favorable
+  - the benefit-risk profile is positive
+  - no change to the benefit-risk
+  - incidence rate
+  - reporting rate
+
+sections:
+  - id: introduction
+    title: Introduction and Product Information
+    mode: deterministic
+    renderer: header_block
+    requires:
+      - period_bounds
+      - total_cases
+
+  - id: exposure
+    title: Estimated Patient Exposure
+    mode: generated
+    prompt: prompts/psur_exposure.jinja
+    max_words: 140
+    requires:
+      - total_cases
+      - period_bounds
+    rules:
+      - No exposure data was supplied. State that patient exposure could not be
+        estimated and that reporting rates therefore cannot be calculated.
+      - Report the case count as a count of reports received, never as a rate,
+        an incidence or a proportion of patients treated.
+
+  - id: cases_overview
+    title: Presentation of Individual Case Histories
+    mode: generated
+    prompt: prompts/psur_cases.jinja
+    max_words: 320
+    max_buckets: 10
+    requires:
+      - total_cases
+      - serious_split
+      - seriousness_criteria
+      - age_bands
+      - sex_distribution
+      - country_distribution
+      - reporter_type
+    rules:
+      - Describe the reported population. Seriousness criteria overlap; say so.
+      - No individual case narratives were supplied. Do not write any.
+
+  - id: reaction_overview
+    title: Overview of Adverse Reactions
+    mode: generated
+    prompt: prompts/psur_reactions.jinja
+    max_words: 320
+    max_buckets: 12
+    requires:
+      - total_reaction_events
+      - top_reactions_by_case
+      - top_serious_reactions
+      - reaction_outcomes
+    rules:
+      - Report at MedDRA Preferred Term level. No System Organ Class field
+        exists in the source data, so no SOC tabulation is possible.
+      - Cumulative figures across previous reporting periods are unavailable.
+        Present interval data only and say that it is interval data.
+
+  - id: signal_review
+    title: Signal Evaluation
+    mode: generated
+    prompt: prompts/psur_signals.jinja
+    max_words: 300
+    max_buckets: 14
+    requires:
+      - monthly_case_volume
+      - monthly_top_reactions
+      - top_serious_reactions
+      - alert_cases
+    rules:
+      - Describe what changed across the interval, with figures attached to
+        every movement.
+      - Do not classify anything as a signal, a potential signal, a validated
+        signal, or an emerging risk. Signal validation requires a qualified
+        assessor and reference data that were not supplied. Present the
+        observations and stop.
+
+  - id: benefit_risk
+    title: Benefit-Risk Considerations
+    mode: generated
+    prompt: prompts/psur_benefit_risk.jinja
+    max_words: 160
+    requires:
+      - safety_actions
+      - data_quality
+    rules:
+      - A benefit-risk evaluation cannot be performed from this data. State
+        precisely what would be required — exposure denominators, efficacy
+        data, the approved label and previous-period comparison — and that none
+        were supplied.
+      - Do not characterise the benefit-risk balance in any direction.
+
+  - id: limitations
+    title: Limitations of the Data
+    mode: generated
+    prompt: prompts/data_limitations.jinja
+    max_words: 260
+    max_buckets: 16
+    requires:
+      - data_quality
+      - total_cases
+    rules:
+      - Report each limitation with its figure from the packet.
+      - Describe the effect of each limitation on interpretation.
+
+  - id: case_listing
+    title: Line Listing of Cases
+    mode: deterministic
+    renderer: case_table
+    requires:
+      - case_index

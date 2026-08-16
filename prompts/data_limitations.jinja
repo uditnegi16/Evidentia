@@ -1,0 +1,31 @@
+{# Data Limitations - validator findings promoted to reader-facing prose. #}
+Section: Data Limitations
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Report the data quality findings with their figures, and say what each one means
+for how the report should be read.
+
+Cover at minimum: cases with no usable age, cases carrying the duplicate flag and
+the fact that they were retained rather than removed, superseded report versions
+collapsed during ingest, and the reaction-outcome misalignments recorded as
+unknown.
+
+State limitations plainly. Do not soften them and do not speculate about why the
+data is incomplete.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

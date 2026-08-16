@@ -1,0 +1,227 @@
+# PADER (FDA, 21 CFR 314.80) report definition.
+#
+# This file is the only place the system knows what a PADER is. Section order,
+# section titles, which analyses each section may quote, and the rules governing
+# its language all live here. Adding a different report type means adding a
+# sibling file, not editing Python.
+
+report_type: PADER
+title: Periodic Adverse Drug Experience Report
+regulatory_basis: 21 CFR 314.80(c)(2)
+
+product:
+  name: Bisoprolol
+  application_number: B-1
+  sponsor: Dev Pharma Client
+  indication: hypertension and heart failure
+  # Fields the supplied data does not establish. Named here so the report can
+  # say "not supplied" rather than leaving a silent gap or inventing a value.
+  unknown_fields:
+    - date of US approval
+    - date of US marketing
+    - approved dosage forms and strengths
+    - product label / CCDS
+
+model:
+  provider: groq
+  name: openai/gpt-oss-120b
+  temperature: 0.0
+  # Reasoning tokens count against this budget, so it must cover both the
+  # chain of thought and the JSON answer.
+  max_tokens: 4000
+  reasoning_effort: low
+  structured_output: strict
+  seed: 7
+  cross_check_model: llama-3.3-70b-versatile
+
+output_formats:
+  - markdown
+  - html
+  - docx
+
+# Applied to every generated section, prepended to the system message.
+global_rules:
+  - Use only the figures provided in the evidence packet. Do not calculate,
+    estimate, extrapolate or round any number that is not given.
+  - Every number you write must appear verbatim in the evidence packet.
+  - Respect the unit of count on each item. A figure marked unit "case" counts
+    cases; one marked unit "reaction_event" counts reaction events. Never
+    compare or combine figures with different units.
+  - State observations, not conclusions. A numerical pattern is not a safety
+    signal. Write what the data shows and leave significance to a qualified
+    reviewer.
+  - Do not assert or deny causality between the product and any reaction.
+  - If the packet does not establish something, say it was not established.
+    Never fill a gap with plausible content.
+  - Write in neutral regulatory prose. No marketing language, no reassurance,
+    no alarm.
+  - Do not invent case narratives, patient details, comorbidities or
+    concomitant medications.
+
+# Deterministic gate, checked against every generated section (Phase 5).
+# The first entry is named explicitly in the challenge brief as the failure
+# mode to avoid.
+forbidden_phrases:
+  - no safety concerns
+  - no new safety concerns
+  - confirmed signal
+  - safety signal was identified
+  - causally related
+  - caused by
+  - proven safe
+  - demonstrates that
+  - proves that
+  - it is clear that
+  - reassuring
+
+sections:
+  - id: reporting_period
+    title: Reporting Period and Product Identification
+    mode: deterministic
+    renderer: header_block
+    requires:
+      - period_bounds
+      - total_cases
+
+  - id: narrative_summary
+    title: Narrative Summary and Analysis
+    mode: generated
+    prompt: prompts/narrative_summary.jinja
+    max_words: 320
+    max_buckets: 8
+    requires:
+      - period_bounds
+      - total_cases
+      - serious_split
+      - top_reactions_by_case
+      - reaction_outcomes
+    analysis_params:
+      top_reactions_by_case:
+        top_n: 8
+    rules:
+      - Open by stating the reporting period and the total number of cases.
+      - Mention the seriousness split, and note that a near-total serious
+        proportion is expected for spontaneous reporting rather than remarkable.
+
+  - id: summary_analysis_of_cases
+    title: Summary Analysis of Cases
+    mode: generated
+    prompt: prompts/summary_analysis.jinja
+    max_words: 340
+    max_buckets: 10
+    requires:
+      - total_cases
+      - serious_split
+      - seriousness_criteria
+      - age_bands
+      - sex_distribution
+      - country_distribution
+      - reporter_type
+    rules:
+      - Seriousness criteria are independent flags. One case may meet several,
+        so those figures do not sum to the case total and their percentages do
+        not sum to 100. State this.
+      - Report unknown or missing values as unknown. Do not omit them and do not
+        redistribute them across known categories.
+
+  - id: reaction_analysis
+    title: Reaction / Adverse Event Analysis
+    mode: generated
+    prompt: prompts/reaction_analysis.jinja
+    max_words: 340
+    max_buckets: 12
+    requires:
+      - total_reaction_events
+      - top_reactions
+      - top_reactions_by_case
+      - top_serious_reactions
+      - reaction_outcomes
+      - reactions_by_sex
+    analysis_params:
+      top_reactions:
+        top_n: 12
+      top_serious_reactions:
+        top_n: 12
+    rules:
+      - No System Organ Class field exists in this dataset. Report at Preferred
+        Term level and state that SOC grouping is unavailable. Never group
+        Preferred Terms into System Organ Classes yourself.
+      - When writing "N cases of X", use the case-level figures. When writing
+        about reaction events, use the event-level figures. Say which you mean.
+
+  - id: serious_cases_alerts
+    title: Serious Cases and 15-Day Alert Reports
+    mode: generated
+    prompt: prompts/serious_alerts.jinja
+    max_words: 300
+    max_buckets: 8
+    requires:
+      - total_cases
+      - serious_split
+      - seriousness_criteria
+      - alert_cases
+      - top_serious_reactions
+    rules:
+      - Expectedness (labelled versus unlabelled) cannot be determined without a
+        product label, and none was supplied. State this rather than assuming
+        cases are unlabelled.
+      - Serious and expedited are counted independently. Report both figures
+        rather than treating them as the same population.
+      - No case narratives are available. Do not write any.
+
+  - id: trends_observations
+    title: Trends and Important Observations
+    mode: generated
+    prompt: prompts/trends.jinja
+    # Twelve months of volume plus leading terms per month legitimately needs
+    # more room than a summary section; 300 was producing review flags on
+    # otherwise clean output.
+    max_words: 380
+    max_buckets: 14
+    requires:
+      - monthly_case_volume
+      - monthly_top_reactions
+      - total_cases
+    rules:
+      - Phrase every movement as an observation with its figures, in the form
+        "reports of X numbered N in month A and M in month B".
+      - The first and last months of the period are partial because the interval
+        does not align to calendar month boundaries. Say so before commenting on
+        either.
+      - Monthly counts are small. Note that ordering can shift on one or two
+        reports and warrants review before interpretation.
+
+  - id: history_of_actions
+    title: History of Safety-Related Actions
+    mode: generated
+    prompt: prompts/history_of_actions.jinja
+    max_words: 130
+    requires:
+      - safety_actions
+      - period_bounds
+    rules:
+      - No action data was supplied. State this plainly in two or three
+        sentences and stop.
+      - Do not infer actions from case data. The absence of recorded actions is
+        not evidence that none were taken.
+
+  - id: data_limitations
+    title: Data Limitations
+    mode: generated
+    prompt: prompts/data_limitations.jinja
+    max_words: 260
+    max_buckets: 16
+    requires:
+      - data_quality
+      - total_cases
+    rules:
+      - Report each limitation with its figure from the packet.
+      - Describe the effect of each limitation on interpretation. Do not
+        minimise, and do not speculate about causes.
+
+  - id: case_index
+    title: Case Index
+    mode: deterministic
+    renderer: case_table
+    requires:
+      - case_index

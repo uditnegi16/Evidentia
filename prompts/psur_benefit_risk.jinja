@@ -1,0 +1,32 @@
+{# Benefit-Risk Considerations - a structured statement of what is missing. #}
+Section: Benefit-Risk Considerations
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Framework: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+A benefit-risk evaluation cannot be performed from the supplied data.
+
+State that plainly, then name precisely what would be required: patient
+exposure denominators, efficacy or effectiveness data, the approved product
+label or CCDS for expectedness assessment, previous reporting period data for
+cumulative comparison, and any regulatory actions taken during the interval.
+
+You may note that no safety-related actions were supplied for this interval.
+
+Do not characterise the benefit-risk balance in any direction, including by
+implication. Do not say it is unchanged, favourable, or under review.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".

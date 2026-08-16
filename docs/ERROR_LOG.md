@@ -138,3 +138,60 @@ the section or inventing content. Expectedness / labelledness is out of scope.
 **Cause:** Unknown. Candidates: the reference excludes one duplicate-flagged case, applies a different tie-break on equal `safetyreportversion`, or filters on a field we treat as out of scope.
 **Fix:** None. The figure is asserted at 54 with a comment pointing here, so it cannot drift silently.
 **Carry-over:** README limitation. Stating a one-case unexplained gap is more defensible than tuning the pipeline until it matches, which would be fitting to an artifact rather than to the data.
+
+
+## E-012 — Import failure that was actually a branch-state failure
+**Phase:** 3
+**Symptom:** `ModuleNotFoundError: No module named 'evidentia.evidence'` on a module verified passing two phases earlier.
+**Cause:** Phase 2 was pushed but its PR never merged, so `main` still held Phase 1. Branching Phase 3 off `main` produced a tree without `evidence.py`.
+**Fix:** Merged Phase 2, rebased. Dropped the PR ceremony entirely afterwards — solo repo, no reviewer, so branch-per-phase bought nothing but a failure mode.
+**Carry-over:** If a previously-green import breaks, suspect the tree before the code.
+
+## E-013 — Empty generation reported as failed JSON validation
+**Phase:** 4
+**Symptom:** `400 json_validate_failed` with `failed_generation: ''`.
+**Cause:** Two compounding causes. `gpt-oss-120b` is a reasoning model and reasoning tokens are charged to the completion budget; at `max_tokens=1200` the chain of thought consumed everything and the answer was empty. Separately, strict structured output on this model family is reported by other users to fail outright.
+**Fix:** `max_tokens` → `max_completion_tokens` at 4000, `reasoning_effort: low`, and a three-rung fallback ladder recording which rung produced each section.
+**Carry-over:** The provider's error named the wrong cause. Truncation was reported as a schema failure.
+
+## E-014 — Six false blocking issues from typographic dashes
+**Phase:** 6
+**Symptom:** First full run blocked `summary_analysis_of_cases` on 45, 64, 65, 74, 75, 84.
+**Cause:** Age bands stored as `45-64` arrive from the model as `45\u201364`. Label masking used literal string comparison, so the band never matched and both boundaries surfaced as fabrications.
+**Fix:** Normalise seven Unicode dash variants before masking. Also masked interval terminology (`15-day Alert`), which was blocking on 15.
+**Carry-over:** A gate producing false positives trains reviewers to ignore it, which is worse than no gate. Masks were kept narrow and a test confirms fabrications adjacent to masked terms still block.
+
+## E-015 — Model performed arithmetic because the figure was withheld
+**Phase:** 6
+**Symptom:** 938 and 1068 blocked as ungrounded.
+**Cause:** Both are real figures the system computed and never sent. 938 is `age_bands.provenance.n_contributing`; 1068 is the raw row count. The model reconstructed 938 as 1024 − 86.
+**Fix:** `numeric_claims()` now harvests numbers from bucket labels (so `65-74` grounds 65 and 74, and `2025-03` grounds 2025), `n_contributing` is sent to the model and claimable, and ingest totals were added to `data_quality`.
+**Carry-over:** Instructing a model not to calculate while hiding the figure it needs is an unfair instruction. Every fix put real figures into the packet; the tolerance was never loosened.
+
+## E-016 — The most important forbidden phrase excused itself
+**Phase:** 7 — **near miss**
+**Symptom:** After adding negation awareness, `test_the_phrase_named_in_the_brief_is_blocked` failed. "no safety concerns were identified" was passing.
+**Cause:** The negation window included the matched phrase, and "no" was a negation marker. The phrase named explicitly in the challenge brief was excusing itself through its own first word — silently, while every other test passed.
+**Fix:** Exclude the matched phrase from the window; drop "no", "none", "never" as markers; tighten windows to 45 characters before and 70 after.
+**Carry-over:** The most dangerous bugs are the ones that disable a safety check while leaving the surrounding tests green. Six tests now pin this, including one burying a real claim twelve sentences after an unrelated denial.
+
+## E-017 — Free-tier rate limit halted a run mid-report
+**Phase:** 7
+**Symptom:** `429 ... tokens per minute (TPM): Limit 8000` after two PSUR sections.
+**Cause:** Seven sections at roughly 2,000 prompt tokens each exceeds the free tier within a minute.
+**Fix:** Retry with backoff, parsing the provider's stated wait.
+**Carry-over:** Anyone running this from the README is on the free tier. Robustness here is not polish.
+
+## E-018 — Internal issue codes leaked into regulatory prose
+**Phase:** 8
+**Symptom:** The Data Limitations section read "the duplicate_flag_present warning was raised for 197 cases".
+**Cause:** `data_quality` buckets were labelled with raw validator codes, which was the only vocabulary the model had.
+**Fix:** Human-readable labels, with a test asserting no underscore or severity marker survives into a packet label.
+**Carry-over:** The model can only be as readable as its packet.
+
+## E-019 — Repeated overwriting of the user's local fixes
+**Phase:** 1-2, process
+**Symptom:** The same test failure reappeared three times across turns.
+**Cause:** Zips were built from the assistant's container copy, which lacked fixes already applied locally.
+**Fix:** Container copy became the single source of truth; every fix applied there first, and every zip verified (lint plus tests) before delivery.
+**Carry-over:** With two copies of a codebase and no sync, one of them is always wrong. Naming which is authoritative is not optional.

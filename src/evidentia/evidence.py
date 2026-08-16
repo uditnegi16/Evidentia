@@ -20,6 +20,7 @@ Provenance can only be captured at compute time. Once an analysis returns
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, date, datetime
 from typing import Any, Literal
 
@@ -27,6 +28,18 @@ from pydantic import BaseModel, Field
 
 CountUnit = Literal["case", "reaction_event"]
 EvidenceKind = Literal["scalar", "distribution", "timeseries", "table", "statement"]
+
+_LABEL_NUMBER = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _numbers_in(label: str) -> set[float]:
+    """Numbers embedded in a category label.
+
+    "65-74" yields 65 and 74; "2025-03" yields 2025 and 3. These are shown to
+    the model as part of the packet, so quoting them is grounding, not
+    fabrication.
+    """
+    return {float(m.group()) for m in _LABEL_NUMBER.finditer(label or "")}
 
 
 class Bucket(BaseModel):
@@ -67,6 +80,10 @@ class Provenance(BaseModel):
         incoherent while reading fluently.
         """
         d: dict[str, Any] = {"unit": self.unit}
+        # How many records this figure was computed from. Withholding it is
+        # what pushed a model to reconstruct it as denominator minus unknown,
+        # which the gate then correctly blocked as arithmetic (E-015).
+        d["n_contributing"] = self.n_contributing
         if self.denominator is not None:
             d["denominator"] = self.denominator
         if self.notes:
@@ -123,6 +140,11 @@ class EvidenceItem(BaseModel):
         Phase 5's grounding gate checks generated prose against the union of
         these across the section's packet. A number outside that set was
         invented.
+
+        Labels count. A bucket called "65-74" puts 65 and 74 in front of the
+        model, so a sentence saying "patients aged 65 and over" is quoting the
+        packet, not calculating. Harvesting labels is what keeps the gate
+        pointed at fabrication rather than at vocabulary.
         """
         out: set[float] = set()
         if isinstance(self.value, (int, float)):
@@ -131,8 +153,10 @@ class EvidenceItem(BaseModel):
             out.add(float(b.count))
             if b.pct is not None:
                 out.add(round(float(b.pct), 1))
+            out |= _numbers_in(b.label)
         if self.provenance.denominator is not None:
             out.add(float(self.provenance.denominator))
+        out.add(float(self.provenance.n_contributing))
         if self.kind == "table":
             out.add(float(len(self.rows)))
         return out

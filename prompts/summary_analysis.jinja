@@ -1,0 +1,27 @@
+{# Summary Analysis of Cases - aggregate case characteristics. #}
+Section: Summary Analysis of Cases
+Report: {{ report_type }} for {{ product.name }}
+{% if regulatory_basis %}Regulatory basis: {{ regulatory_basis }}{% endif %}
+
+Approved evidence for this section. These are the only figures you may state.
+
+{{ evidence_json }}
+
+Rules:
+{% for rule in rules %}
+- {{ rule }}
+{% endfor %}
+
+Task:
+Describe the case population: volume, seriousness, the criteria met, and the
+distribution across age, sex, country and reporter qualification.
+
+Give the figure for every category you mention, including unknown categories.
+Where a distribution is dominated by one value, say so with its number rather
+than characterising it in words alone.
+
+Write at most {{ max_words }} words as continuous regulatory prose.
+Do not use headings, bullet points or tables. Do not restate these instructions.
+Return JSON only, matching the schema you were given: the prose in "prose", the
+evidence keys you actually used in "evidence_used", and any figure you needed but
+could not find in "flags".
