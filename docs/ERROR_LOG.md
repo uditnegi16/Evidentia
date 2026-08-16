@@ -1,0 +1,119 @@
+# Error Log
+
+Problems encountered during the build, what caused them, and how they were resolved.
+Kept because "what went wrong and how I fixed it" is one of the most likely live-interview
+questions, and because several of these become Known Limitations in the README.
+
+**Entry format**
+
+```
+## E-00N — Short title
+Phase:      which build phase
+Symptom:    what was observed
+Cause:      what was actually wrong
+Fix:        what changed
+Carry-over: does this become a README limitation, a test, or a config option?
+```
+
+---
+
+## Anticipated issues (pre-registered before they happen)
+
+Recording these up front so it is clear which were predicted and which were surprises.
+
+### A-1 — Case vs reaction double counting
+1,068 rows map to 1,024 unique `safetyreportid` values. Any analysis that counts rows
+rather than cases will silently overstate. Every analysis must declare its unit of
+count in the evidence packet.
+**Mitigation:** unit-of-count is a required field on the evidence contract, not a comment.
+
+### A-2 — Seriousness flags are not mutually exclusive
+The six `seriousness*` columns are independent yes/no flags. Summing them across a case
+produces a number larger than the case count. Any breakdown by seriousness type must be
+presented as overlapping categories.
+**Mitigation:** a test asserting the sum of seriousness flags exceeds total serious cases.
+
+### A-3 — Strict structured output rejects optional fields
+Groq strict mode requires all fields present and `additionalProperties: false`. A pydantic
+model using `Optional[...]` will produce a 400.
+**Mitigation:** LLM-facing schemas use empty list / empty string, never null.
+
+### A-4 — Near-degenerate serious/non-serious split
+1,023 of 1,024 cases are serious. A model asked to "compare serious and non-serious cases"
+will be tempted to invent contrast where the data has none.
+**Mitigation:** the section prompt states the distribution is near-degenerate and instructs
+the model to report it as such rather than analyse it as a comparison.
+
+### A-5 — No SOC field
+Only MedDRA Preferred Term is available. The reference sample document groups by System
+Organ Class, which cannot be reproduced from this dataset.
+**Mitigation:** report at PT level and state explicitly that SOC grouping is unavailable.
+Under no circumstances infer SOC from PT.
+
+### A-6 — Two country columns
+`occurcountry` and `primarysource_reportercountry` usually agree. One must be chosen and
+the choice surfaced in the report, with the disagreement rate computed and noted.
+
+### A-7 — No history of actions, no product label
+Neither is supplied. The report must state that none were provided rather than omitting
+the section or inventing content. Expectedness / labelledness is out of scope.
+
+---
+
+## Actual issues
+
+## E-001 — Multi-value reaction fields nearly went undetected
+**Phase:** 0 (profiling)
+**Symptom:** `patient_reaction_reactionmeddrapt` showed 882 uniques in 1,068 rows; `patient_reaction_reactionoutcome` showed 251 uniques for a ~6-term vocabulary. Values like `recovered/resolved,recovered/resolved` appeared in the head of the value counts.
+**Cause:** Multiple reactions are packed comma-separated into a single cell. Neither the challenge brief nor the Starter Guide mentions this.
+**Fix:** Split on comma and explode before reaction-level analysis. Verified: yields exactly 3,648 events, matching the reference PADER.
+**Carry-over:** Becomes a pytest assertion (`test_reaction_event_count == 3648`) and a README paragraph. This was the single highest-impact finding of the build — without it every reaction figure would have been silently wrong.
+
+## E-002 — `pd.to_datetime` silently produced 1970 dates
+**Phase:** 0 (profiling)
+**Symptom:** Date range printed as `1970-01-01 00:00:00.020241227 -> 1970-01-01 00:00:00.020251226`.
+**Cause:** `receivedate` is `int64` in YYYYMMDD form. `to_datetime` on an integer series interprets it as nanoseconds since epoch. No error, no warning.
+**Fix:** `pd.to_datetime(df["receivedate"].astype(str), format="%Y%m%d")`. Correct range is 2024-12-27 to 2025-12-26, matching the reference.
+**Carry-over:** Validation test asserts the period bounds. Also a good example of why silent-success bugs are the dangerous ones in this domain.
+
+## E-003 — Corrupt value in the age unit column
+**Phase:** 0 (profiling)
+**Symptom:** `patient_patientonsetageunit` value counts include the integer `800` (3 rows) alongside year/month/week/day.
+**Cause:** Data quality defect in the source.
+**Fix:** Quarantine those 3 rows from age analysis, count them in the validation report, do not convert.
+**Carry-over:** Known limitation. Demonstrates that the ingest layer detects rather than assumes.
+
+## E-004 — Three country columns, not the two documented
+**Phase:** 0 (profiling)
+**Symptom:** `primarysourcecountry`, `occurcountry`, and `primarysource_reportercountry` all present. The Starter Guide mentions two.
+**Cause:** Guide is a simplification.
+**Fix:** Use `primarysourcecountry` (zero nulls). Report the 8-row disagreement with `occurcountry`.
+**Carry-over:** Noted in the report as a stated methodological choice.
+
+## E-005 — `duplicate` flag set on ~20% of cases with no definition
+**Phase:** 0 (profiling)
+**Symptom:** 218 rows / 204 cases carry `duplicate = 1`. No accompanying documentation.
+**Cause:** Field is present in the E2B/FAERS-style schema but undefined for this exercise.
+**Fix:** Count and surface; do not remove.
+**Carry-over:** Known limitation, and an example of the system declining to make an unevidenced analytical decision.
+
+## E-006 — egg-info and xlsx nearly entered git history
+**Phase:** 0 (scaffold)
+**Symptom:** `.gitignore` specified `*.csv` but the supplied dataset is `.xlsx`. Separately, `pip install -e .` generated `src/evidentia.egg-info/`, which was committed.
+**Cause:** Assumed the file format stated in the brief.
+**Fix:** Added `*.xlsx`, `*.xls`, `data/`, `*.egg-info/`, `build/`, `dist/`. Untracked egg-info with `git rm -r --cached`.
+**Carry-over:** Loader now dispatches on file extension and accepts both CSV and Excel, since the brief and the delivered artifact disagreed.
+
+## E-007 — Post-dedup reaction count does not match the reference PADER
+**Phase:** 1 (ingest)
+**Symptom:** Reference PADER reports 3,648 reaction events. Our post-dedup count is 3,429.
+**Cause:** Not a defect. 3,648 is exactly our *pre*-dedup figure, so the reference pipeline counts every row including superseded report versions. The 44 superseded rows carry 219 reaction events.
+**Fix:** None applied. We report 3,429 and assert 3,648 separately as proof the comma-split model matches theirs. Divergence documented as D-017.
+**Carry-over:** README limitation and a likely live-interview question. Prepared answer: the split is validated against the reference; only the dedup policy differs, and it is a config-level policy rather than a code path.
+
+## E-008 — Branch already existed on re-run
+**Phase:** 1 (setup)
+**Symptom:** `git checkout -b phase-1-ingest` failed with "a branch named ... already exists".
+**Cause:** Branch created in an earlier session.
+**Fix:** `git checkout phase-1-ingest`. Untracked extracted files are unaffected by branch switching.
+**Carry-over:** None.
